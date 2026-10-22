@@ -105,7 +105,9 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   b.classList.add("on"); $(b.dataset.t).classList.add("on");
 });
 function renderDid(){
-  $("didbox").innerHTML = W.did ? `<label>내 DID</label><div class="did">${esc(W.did)}</div>` : `<p class="note">아직 DID가 없습니다.</p>`;
+  $("didbox").innerHTML = W.did ? `<label>내 DID</label><div class="did">${esc(W.did)}</div>
+    <details style="margin-top:8px"><summary class="note">내 did.jsonl 보기 (공개용, 개인키 없음)</summary><pre id="myLog">${esc(W.logLine||"")}</pre>
+    <button class="btn ghost" onclick="navigator.clipboard.writeText(document.getElementById('myLog').textContent)">did.jsonl 복사</button></details>` : `<p class="note">아직 DID가 없습니다.</p>`;
   $("vcList").innerHTML = (W.vcs||[]).map((v,i)=>`<label>보관 VC #${i+1} — ${esc(v.type.join(", "))}</label><pre>${esc(JSON.stringify(v.credentialSubject,null,2))}</pre>`).join("");
 }
 renderDid();
