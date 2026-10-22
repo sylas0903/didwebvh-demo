@@ -36,10 +36,18 @@ ul.steps{padding-left:0;list-style:none;margin:10px 0 0}ul.steps li{padding:3px 
   <button data-t="t4">④ 제출(VP)</button>
   <button data-t="t5">검증자</button>
   <a href="./chain.html" style="align-self:center;margin-left:8px">컨트랙트 연결(Sepolia) →</a>
+  <a href="./roles.html" style="align-self:center;margin-left:8px">역할 분리 시연 →</a>
 </nav>
 
 <section id="t1" class="on">
   <h2>내 did:webvh 만들기</h2>
+  <label>지갑 프로필 (투자자별 DID)</label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <select id="prof" style="padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></select>
+    <input id="newProf" placeholder="새 프로필 이름 (예: holder3)" style="width:220px">
+    <button class="btn ghost" id="addProf" style="margin:0">프로필 추가</button>
+  </div>
+  <p class="note">프로필마다 키·DID·VC 가 따로 저장됩니다. ②~④ 탭은 선택한 프로필로 동작합니다.</p>
   <div id="didbox"></div>
   <label>호스팅 경로</label>
   <input id="hostpath">
@@ -94,12 +102,26 @@ import * as ed from "./vendor/noble-ed25519-2.1.0.js";
 import { makeKit } from "./webvh.js";
 const K = makeKit(ed);
 const $ = (id) => document.getElementById(id);
-const ST = "didwebvh-demo-wallet";
-const load = () => { try { return JSON.parse(localStorage.getItem(ST)) || {}; } catch { return {}; } };
-const save = (w) => { try { localStorage.setItem(ST, JSON.stringify(w)); } catch { alertBox("브라우저 저장소를 쓸 수 없습니다. 키 백업을 꼭 보관하세요."); } };
-let W = load();
+const ST = "didwebvh-demo-wallet", STS = "didwebvh-demo-wallets";
+function loadAll() {
+  let all = null;
+  try { all = JSON.parse(localStorage.getItem(STS)); } catch {}
+  if (!all) { let old = {}; try { old = JSON.parse(localStorage.getItem(ST)) || {}; } catch {} all = { active: "holder", profiles: { holder: old } }; }
+  return all;
+}
+let ALL = loadAll();
+let W = ALL.profiles[ALL.active] || {};
+const save = (w) => {
+  ALL.profiles[ALL.active] = w;
+  try { localStorage.setItem(STS, JSON.stringify(ALL)); localStorage.setItem(ST, JSON.stringify(w)); }
+  catch { alertBox("브라우저 저장소를 쓸 수 없습니다. 키 백업을 꼭 보관하세요."); }
+};
 const siteBase = location.host + location.pathname.replace(/\/[^/]*$/, "");
-$("hostpath").value = W.hostPath || (siteBase + "/holder");
+function renderProfiles() {
+  $("prof").innerHTML = Object.keys(ALL.profiles).map(n => `<option ${n === ALL.active ? "selected" : ""}>${n.replace(/[<>&"]/g, "")}</option>`).join("");
+  $("hostpath").value = W.hostPath || (siteBase + "/" + ALL.active);
+}
+function switchTo(name) { ALL.active = name; W = ALL.profiles[name] || {}; save(W); renderProfiles(); renderDid(); $("pub").innerHTML = ""; }
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 function alertBox(m){ $("pub").innerHTML = `<p class="bad">${esc(m)}</p>`; }
 function li(ok, t){ return `<li class="${ok ? "ok" : "bad"}">${ok ? "✔" : "✘"} ${esc(t)}</li>`; }
@@ -113,7 +135,14 @@ function renderDid(){
     <button class="btn ghost" onclick="navigator.clipboard.writeText(document.getElementById('myLog').textContent)">did.jsonl 복사</button></details>` : `<p class="note">아직 DID가 없습니다.</p>`;
   $("vcList").innerHTML = (W.vcs||[]).map((v,i)=>`<label>보관 VC #${i+1} — ${esc(v.type.join(", "))}</label><pre>${esc(JSON.stringify(v.credentialSubject,null,2))}</pre>`).join("");
 }
-renderDid();
+renderProfiles(); renderDid();
+$("prof").onchange = () => switchTo($("prof").value);
+$("addProf").onclick = () => {
+  const n = $("newProf").value.trim();
+  if (!/^[a-z0-9-]{2,32}$/.test(n)) return alertBox("프로필 이름은 영문 소문자·숫자·하이픈 2~32자");
+  if (ALL.profiles[n]) return switchTo(n);
+  ALL.profiles[n] = {}; $("newProf").value = ""; switchTo(n);
+};
 const copyBtn = (btn, pre) => { btn.style.display="inline-block"; btn.onclick = () => navigator.clipboard.writeText($(pre).textContent); };
 
 $("mk").onclick = async () => {

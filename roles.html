@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>역할 분리 시연 (Sepolia)</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14171c;--sub:#5b6472;--line:#dde1e7;--acc:#1f5fbf;--ok:#16794a;--bad:#b3261e;--code:#f1f3f6;--warn:#8a5a00;--op:#6b3fa0;--inv:#1f7a6b}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1a1e24;--ink:#e8ebf0;--sub:#9aa3b0;--line:#2c323b;--acc:#6aa2ff;--ok:#4cc38a;--bad:#ff7b72;--code:#22272f;--warn:#e3b341;--op:#b48cf0;--inv:#5fd0bd}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+main{max-width:920px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}p.lead{color:var(--sub);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 8px}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;margin-right:6px;color:#fff}
+.tag.op{background:var(--op)}.tag.inv{background:var(--inv)}
+.btn{display:inline-block;margin:8px 8px 0 0;border:0;background:var(--acc);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+.btn.ghost{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+.note{color:var(--sub);font-size:13px;margin:4px 0}
+input,select{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:13px ui-monospace,Menlo,monospace}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}.row label{font-weight:600;font-size:14px;min-width:84px}
+.grow{flex:1;min-width:260px}
+ul.steps{list-style:none;padding:0;margin:10px 0 0;font-size:14px}ul.steps li{padding:2px 0;word-break:break-all}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.mono{font:12px ui-monospace,Menlo,monospace;word-break:break-all}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}th,td{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left}
+th{color:var(--sub);font-weight:600}
+#who{position:sticky;top:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px}
+a{color:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+<h1>역할 분리 시연: 운영자 1 · 투자자 2</h1>
+<p class="lead">Account 1 = 운영자(컨트랙트 owner), Account 2·3 = 투자자. 각 버튼은 표시된 역할의 계정으로 MetaMask 를 바꾼 뒤 누르세요. <a href="./chain.html">← 단일 계정 페이지</a> · <a href="./index.html">지갑</a></p>
+
+<div id="who">현재 MetaMask 계정: <b id="cur">연결 안 됨</b> <span id="curRole"></span>
+  <button class="btn ghost" id="connect" style="margin:0 0 0 8px;padding:4px 10px">연결</button></div>
+
+<div class="card">
+  <h2>0. 계정·컨트랙트 설정</h2>
+  <div class="row"><label>운영자</label><input id="opAddr" class="grow" placeholder="Account 1 주소 (배포한 계정)"></div>
+  <div class="row"><label>투자자 A</label><input id="aAddr" class="grow" placeholder="Account 2 주소"><select id="aProf"></select></div>
+  <div class="row"><label>투자자 B</label><input id="bAddr" class="grow" placeholder="Account 3 주소"><select id="bProf"></select></div>
+  <div class="row"><label>Registry</label><input id="regAddr" class="grow"></div>
+  <div class="row"><label>DAS 토큰</label><input id="dasAddr" class="grow"></div>
+  <div class="row"><label>Anchor</label><input id="ancAddr" class="grow"></div>
+  <p class="note">컨트랙트 주소는 단일 계정 페이지에서 배포한 값이 자동으로 채워집니다. 투자자 옆 선택상자는 지갑 페이지의 DID 프로필입니다.</p>
+  <button class="btn" id="saveCfg">저장</button>
+  <ul class="steps" id="s0"></ul>
+</div>
+
+<div class="card">
+  <h2>상태표</h2>
+  <button class="btn ghost" id="refresh">새로고침</button>
+  <table><thead><tr><th>역할</th><th>주소</th><th>isVerified</th><th>DAS</th><th>ETH</th><th>연결 DID</th></tr></thead><tbody id="tbl"></tbody></table>
+</div>
+
+<div class="card">
+  <h2><span class="tag op">운영자</span>1. 투자자에게 가스용 ETH 보내기</h2>
+  <p class="note">투자자 계정은 ETH 가 없으면 서명은 되지만 전송 트랜잭션을 못 보냅니다.</p>
+  <button class="btn" id="fundA">A 에게 0.005 ETH</button><button class="btn" id="fundB">B 에게 0.005 ETH</button>
+  <ul class="steps" id="s1"></ul>
+</div>
+
+<div class="card">
+  <h2>2. 투자자 KYC 온보딩 (did:webvh)</h2>
+  <p class="note">① <span class="tag inv">투자자</span> 계정으로 바꿔 VP 생성 + 지갑 서명 → ② <span class="tag op">운영자</span> 계정으로 바꿔 검증 후 등록. 검증이 하나라도 실패하면 등록 트랜잭션을 보내지 않습니다.</p>
+  <div class="row"><select id="who2"><option value="a">투자자 A</option><option value="b">투자자 B</option></select>
+    <button class="btn" id="invSign" style="margin:0">① 투자자: VP + 지갑 서명</button>
+    <button class="btn" id="opReg" style="margin:0">② 운영자: 검증 후 등록</button></div>
+  <ul class="steps" id="s2"></ul>
+</div>
+
+<div class="card">
+  <h2><span class="tag op">운영자</span>3. 토큰증권 발행</h2>
+  <div class="row"><select id="who3"><option value="a">투자자 A</option><option value="b">투자자 B</option></select>
+    <input id="mintAmt" value="100" style="width:100px"><button class="btn" id="mint" style="margin:0">발행</button></div>
+  <ul class="steps" id="s3"></ul>
+</div>
+
+<div class="card">
+  <h2><span class="tag inv">투자자</span>4. 투자자 간 전송</h2>
+  <p class="note">보내는 투자자 계정으로 바꾼 뒤 누르세요. 먼저 사전검사(가스 없음)를 하고, 통과할 때만 트랜잭션을 보냅니다.</p>
+  <div class="row"><select id="dir"><option value="ab">A → B</option><option value="ba">B → A</option></select>
+    <input id="xAmt" value="10" style="width:100px"><button class="btn" id="xfer" style="margin:0">보내기</button></div>
+  <ul class="steps" id="s4"></ul>
+</div>
+
+<div class="card">
+  <h2><span class="tag op">운영자</span>5. KYC 회수 · 강제 이전</h2>
+  <div class="row"><select id="who5"><option value="b">투자자 B</option><option value="a">투자자 A</option></select>
+    <button class="btn" id="revoke" style="margin:0">KYC 클레임 회수</button></div>
+  <div class="row"><select id="fdir"><option value="ba">B 의 토큰 → A 로 강제 이전</option><option value="ab">A 의 토큰 → B 로 강제 이전</option></select>
+    <input id="fAmt" value="5" style="width:100px"><button class="btn ghost" id="forced" style="margin:0">강제 이전 (forcedTransfer)</button></div>
+  <p class="note">회수 후 4단계를 양방향으로 다시 해 보세요. forcedTransfer 는 보내는 쪽 검사를 건너뛰지만 받는 쪽 KYC 는 여전히 검사합니다.</p>
+  <ul class="steps" id="s5"></ul>
+</div>
+</main>
+
+<script type="module">
+import * as ed from "./vendor/noble-ed25519-2.1.0.js";
+import { ethers } from "./vendor/ethers-6.13.4.min.js";
+import { makeKit } from "./webvh.js";
+const K = makeKit(ed);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const SCAN = "https://sepolia.etherscan.io";
+const TRUSTED_ISSUERS = ["did:webvh:QmbHiA5e4ZyPNMvMH17ba4gz4zDLAGBm4y9hxLkmqBYDt9:sylas0903.github.io:didwebvh-demo:issuer"];
+const ACCEPTED_TYPES = ["DemoParticipationCredential", "KycCredential"];
+const CFG_KEY = "didwebvh-demo-roles";
+let ART, provider, cur = null;
+const SUB = {};   // 투자자 제출물 (VP + 지갑 서명), 페이지 메모리에만 보관
+
+const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+function profiles() { const all = lsGet("didwebvh-demo-wallets"); if (all) return all.profiles; const one = lsGet("didwebvh-demo-wallet"); return one ? { holder: one } : {}; }
+function clearPending(id) { const l = $(id).lastElementChild; if (l && l.classList.contains("warn")) l.remove(); }
+function out(id, ok, html) { if (ok !== null) clearPending(id); $(id).insertAdjacentHTML("beforeend", `<li class="${ok === true ? "ok" : ok === false ? "bad" : "warn"}">${ok === true ? "✔" : ok === false ? "✘" : "…"} ${html}</li>`); }
+const txLink = (h) => `<a href="${SCAN}/tx/${h}" target="_blank" rel="noopener">tx</a>`;
+const short = (a) => a ? a.slice(0, 6) + "…" + a.slice(-4) : "";
+const cfg = () => ({ op: $("opAddr").value.trim(), a: $("aAddr").value.trim(), b: $("bAddr").value.trim(),
+  reg: $("regAddr").value.trim(), das: $("dasAddr").value.trim(), anc: $("ancAddr").value.trim(),
+  aProf: $("aProf").value, bProf: $("bProf").value });
+function roleOf(addr) { const c = cfg(); if (!addr) return ""; const l = addr.toLowerCase();
+  return l === c.op.toLowerCase() ? "운영자" : l === c.a.toLowerCase() ? "투자자 A" : l === c.b.toLowerCase() ? "투자자 B" : "미지정"; }
+function errName(e) {
+  const data = e?.data || e?.info?.error?.data || e?.error?.data;
+  for (const n of ["OnchainIdRegistry", "TokenSecurity", "DidWebvhAnchor"]) { try { const p = new ethers.Interface(ART[n].abi).parseError(data); if (p) return p.name; } catch {} }
+  return e?.shortMessage || e?.message || String(e);
+}
+async function signerAs(role, id) {
+  const s = await provider.getSigner(); const addr = await s.getAddress();
+  const want = cfg()[role];
+  if (!want || addr.toLowerCase() !== want.toLowerCase()) {
+    throw new Error(`MetaMask 를 ${role === "op" ? "운영자" : role === "a" ? "투자자 A" : "투자자 B"} 계정(${short(want)})으로 바꿔 주세요 — 지금은 ${roleOf(addr)} ${short(addr)}`);
+  }
+  return s;
+}
+function contracts(s) { const c = cfg(); return {
+  reg: new ethers.Contract(c.reg, ART.OnchainIdRegistry.abi, s), das: new ethers.Contract(c.das, ART.TokenSecurity.abi, s), anc: new ethers.Contract(c.anc, ART.DidWebvhAnchor.abi, s) }; }
+async function send(id, label, p) {
+  out(id, null, `${esc(label)} — MetaMask 승인`);
+  const rc = await (await p).wait(); out(id, true, `${esc(label)} ${txLink(rc.hash)}`); return rc;
+}
+async function updateWho() {
+  try { const a = (await window.ethereum.request({ method: "eth_accounts" }))[0]; cur = a ? ethers.getAddress(a) : null; } catch { cur = null; }
+  $("cur").textContent = cur || "연결 안 됨"; $("curRole").textContent = cur ? `(${roleOf(cur)})` : "";
+}
+
+// ---------- 설정 ----------
+(async () => {
+  ART = await (await fetch("./contracts.json")).json();
+  const p = Object.keys(profiles());
+  for (const sel of ["aProf", "bProf"]) $(sel).innerHTML = p.map(n => `<option>${esc(n)}</option>`).join("") || "<option>(지갑 프로필 없음)</option>";
+  const saved = lsGet(CFG_KEY) || {}; const dep = lsGet("didwebvh-demo-sepolia") || {};
+  $("opAddr").value = saved.op || dep.owner || ""; $("aAddr").value = saved.a || ""; $("bAddr").value = saved.b || "";
+  $("regAddr").value = saved.reg || dep.reg || ""; $("dasAddr").value = saved.das || dep.das || ""; $("ancAddr").value = saved.anc || dep.anc || "";
+  if (saved.aProf && p.includes(saved.aProf)) $("aProf").value = saved.aProf;
+  if (saved.bProf && p.includes(saved.bProf)) $("bProf").value = saved.bProf; else if (p.length > 1) $("bProf").value = p[1];
+  if (window.ethereum) { provider = new ethers.BrowserProvider(window.ethereum); window.ethereum.on?.("accountsChanged", updateWho); updateWho(); }
+})();
+$("connect").onclick = async () => {
+  try {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    if ((await provider.getNetwork()).chainId !== 11155111n) {
+      await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xaa36a7" }] });
+      provider = new ethers.BrowserProvider(window.ethereum);
+    }
+    await updateWho();
+  } catch (e) { out("s0", false, esc(e.message || e)); }
+};
+$("saveCfg").onclick = () => {
+  const c = cfg(); $("s0").innerHTML = "";
+  for (const k of ["op", "a", "b", "reg", "das", "anc"]) if (!ethers.isAddress(c[k])) return out("s0", false, `${k} 주소가 올바르지 않습니다`);
+  if (new Set([c.op, c.a, c.b].map(x => x.toLowerCase())).size < 3) return out("s0", false, "운영자·A·B 는 서로 다른 계정이어야 합니다");
+  if (c.aProf === c.bProf) return out("s0", false, "투자자 A·B 는 서로 다른 DID 프로필이어야 합니다");
+  lsSet(CFG_KEY, c); out("s0", true, "저장됨"); updateWho(); refresh();
+};
+
+// ---------- 상태표 ----------
+async function refresh() {
+  try {
+    const c = cfg(); const { reg, das, anc } = contracts(provider);
+    const rows = [["운영자", c.op], ["투자자 A", c.a], ["투자자 B", c.b]];
+    const html = await Promise.all(rows.map(async ([r, a]) => {
+      if (!ethers.isAddress(a)) return `<tr><td>${r}</td><td colspan="5">-</td></tr>`;
+      const [v, bal, eth, did] = await Promise.all([reg.isVerified(a), das.balanceOf(a), provider.getBalance(a), anc.didOf(a)]);
+      return `<tr><td>${r}</td><td class="mono">${short(a)}</td><td class="${v ? "ok" : "bad"}">${v}</td><td>${bal}</td><td>${ethers.formatEther(eth).slice(0, 7)}</td><td class="mono">${did ? esc(did.split(":")[2].slice(0, 10) + "…:" + did.split(":").pop()) : "-"}</td></tr>`;
+    }));
+    $("tbl").innerHTML = html.join("");
+  } catch (e) { $("tbl").innerHTML = `<tr><td colspan="6" class="bad">${esc(errName(e))}</td></tr>`; }
+}
+$("refresh").onclick = refresh;
+
+// ---------- 1. 가스 지원 ----------
+for (const w of ["a", "b"]) $("fund" + w.toUpperCase()).onclick = async () => {
+  try { const s = await signerAs("op"); await send("s1", `ETH 0.005 → 투자자 ${w.toUpperCase()}`, s.sendTransaction({ to: cfg()[w], value: ethers.parseEther("0.005") })); refresh(); }
+  catch (e) { out("s1", false, esc(errName(e))); }
+};
+
+// ---------- 2. 온보딩 ----------
+$("invSign").onclick = async () => {
+  const w = $("who2").value; const id = "s2";
+  try {
+    const s = await signerAs(w); const addr = await s.getAddress();
+    const prof = profiles()[cfg()[w + "Prof"]];
+    if (!prof?.sk || !prof.vcs?.length) throw new Error(`지갑 프로필 '${cfg()[w + "Prof"]}' 에 DID 키/VC 가 없습니다`);
+    const challenge = `kyc-bind:11155111:${addr}:${ethers.hexlify(ethers.randomBytes(8)).slice(2)}`;
+    const key = await K.keyFromSecret(prof.sk);
+    const vp = { "@context": ["https://www.w3.org/ns/credentials/v2"], type: ["VerifiablePresentation"], holder: prof.did, verifiableCredential: [prof.vcs[prof.vcs.length - 1]] };
+    vp.proof = await K.diSign(vp, key.sk, { verificationMethod: prof.vm, proofPurpose: "authentication", challenge, domain: location.host });
+    out(id, true, `투자자 ${w.toUpperCase()}: VP 생성 (DID 키 서명, challenge 에 지갑 주소 포함)`);
+    const msg = `did:webvh wallet binding\nDID: ${prof.did}\nWallet: ${addr}\nChallenge: ${challenge}`;
+    out(id, null, "MetaMask: 지갑↔DID 연결 메시지 서명");
+    const sig = await s.signMessage(msg);
+    SUB[w] = { vp, sig, addr, challenge, msg };
+    out(id, true, `투자자 ${w.toUpperCase()}: 지갑 서명 완료 → 이제 MetaMask 를 운영자 계정으로 바꾸고 ② 를 누르세요`);
+  } catch (e) { out(id, false, esc(errName(e))); }
+};
+
+async function verifySubmission(sub, step) {
+  const { vp } = sub;
+  if (vp.proof.challenge !== sub.challenge || !sub.challenge.includes(sub.addr)) throw new Error("VP challenge 불일치");
+  step("VP challenge = 투자자 지갑 주소 + 1회용 nonce");
+  const h = await K.resolve(vp.holder); step(`투자자 DID 해석: ${h.url} (${h.steps.join(", ")})`);
+  if (!(await K.diVerify(vp, vp.proof, K.findVm(h.doc, vp.proof.verificationMethod, "authentication")))) throw new Error("VP 서명 불일치");
+  step("VP 서명 검증 → DID 키 보유");
+  if (ethers.verifyMessage(sub.msg, sub.sig) !== sub.addr) throw new Error("지갑 서명 불일치");
+  step("지갑 서명 검증 → 지갑 키 보유");
+  const vc = vp.verifiableCredential[0];
+  if (!TRUSTED_ISSUERS.includes(vc.issuer)) throw new Error("신뢰 목록 밖 발급자");
+  if (!vc.type.some(t => ACCEPTED_TYPES.includes(t))) throw new Error("허용되지 않는 VC 유형");
+  if (vc.credentialSubject.id !== vp.holder) throw new Error("VC 주체 ≠ 제출자");
+  const i = await K.resolve(vc.issuer); step(`발급자 DID 해석 (신뢰 목록 포함, ${i.steps.join(", ")})`);
+  if (!(await K.diVerify(vc, vc.proof, K.findVm(i.doc, vc.proof.verificationMethod, "assertionMethod")))) throw new Error("VC 서명 불일치");
+  step("VC 서명 검증");
+  return { holder: vp.holder, hv: h.versionId, issuer: vc.issuer, iv: i.versionId, vc };
+}
+$("opReg").onclick = async () => {
+  const w = $("who2").value; const id = "s2"; const step = (t) => out(id, true, esc(t));
+  try {
+    const sub = SUB[w]; if (!sub) throw new Error(`투자자 ${w.toUpperCase()} 의 제출물이 없습니다 — ① 먼저`);
+    const s = await signerAs("op"); const { reg, anc } = contracts(s);
+    const v = await verifySubmission(sub, step);
+    const data = ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "bytes32", "bytes32", "string"],
+      [ethers.id(v.holder), ethers.sha256(ethers.toUtf8Bytes(K.jcs(v.vc))), ethers.id(v.issuer), v.iv]);
+    if (!(await reg.identityOf(sub.addr))[2]) await send(id, "addIdentity", reg.addIdentity(sub.addr, ethers.sha256(ethers.toUtf8Bytes(v.holder)), 410));
+    await send(id, "addClaim(KYC, data=DID·VC 해시)", reg.addClaim(sub.addr, 1, sub.sig, data, BigInt(Math.floor(Date.now() / 1000) + 730 * 86400)));
+    const linked = await anc.walletOfDid(ethers.id(v.holder));
+    if (linked !== ethers.ZeroAddress && linked.toLowerCase() !== sub.addr.toLowerCase()) await send(id, `이전 연결 해제 (${short(linked)})`, anc.unlinkDid(linked));
+    const curDid = await anc.didOf(sub.addr);
+    if (curDid && curDid !== v.holder) await send(id, "이 지갑의 이전 DID 연결 해제", anc.unlinkDid(sub.addr));
+    if ((await anc.didOf(sub.addr)) !== v.holder) await send(id, "linkDid", anc.linkDid(sub.addr, v.holder));
+    for (const [did, vid] of [[v.holder, v.hv], [v.issuer, v.iv]]) {
+      const n = BigInt(vid.split("-")[0]); const [c0] = await anc.anchorOf(did);
+      if (n > c0) await send(id, `anchorVersion(v${n})`, anc.anchorVersion(did, n, vid));
+    }
+    delete SUB[w];
+    out(id, true, `<b>투자자 ${w.toUpperCase()} 등록 완료 — isVerified = ${await reg.isVerified(sub.addr)}</b>`); refresh();
+  } catch (e) { out(id, false, esc(errName(e))); out(id, true, "온체인 등록 없음 (검증 실패 시 트랜잭션을 보내지 않음)"); }
+};
+
+// ---------- 3. 발행 ----------
+$("mint").onclick = async () => {
+  const w = $("who3").value;
+  try {
+    const s = await signerAs("op"); const { das } = contracts(s); const to = cfg()[w]; const amt = BigInt($("mintAmt").value);
+    try { await das.mint.staticCall(to, amt); } catch (e) { return out("s3", false, `사전검사 거부: <b>${esc(errName(e))}</b> (트랜잭션 보내지 않음)`); }
+    await send("s3", `mint → 투자자 ${w.toUpperCase()} ${amt}`, das.mint(to, amt)); refresh();
+  } catch (e) { out("s3", false, esc(errName(e))); }
+};
+
+// ---------- 4. 투자자 간 전송 ----------
+$("xfer").onclick = async () => {
+  const [f, t] = $("dir").value.split("");
+  try {
+    const s = await signerAs(f); const { das } = contracts(s); const to = cfg()[t]; const amt = BigInt($("xAmt").value);
+    try { await das.transfer.staticCall(to, amt); }
+    catch (e) { return out("s4", false, `${f.toUpperCase()} → ${t.toUpperCase()} ${amt}: 사전검사 거부 <b>${esc(errName(e))}</b> (트랜잭션 보내지 않음)`); }
+    await send("s4", `${f.toUpperCase()} → ${t.toUpperCase()} ${amt} DAS`, das.transfer(to, amt)); refresh();
+  } catch (e) { out("s4", false, esc(errName(e))); }
+};
+
+// ---------- 5. 회수 · 강제 이전 ----------
+$("revoke").onclick = async () => {
+  const w = $("who5").value;
+  try { const s = await signerAs("op"); const { reg } = contracts(s);
+    await send("s5", `revokeClaim(투자자 ${w.toUpperCase()})`, reg.revokeClaim(cfg()[w], 1));
+    out("s5", true, `투자자 ${w.toUpperCase()} isVerified = ${await reg.isVerified(cfg()[w])}`); refresh();
+  } catch (e) { out("s5", false, esc(errName(e))); }
+};
+$("forced").onclick = async () => {
+  const [f, t] = $("fdir").value.split("");
+  try { const s = await signerAs("op"); const { das } = contracts(s); const amt = BigInt($("fAmt").value);
+    try { await das.forcedTransfer.staticCall(cfg()[f], cfg()[t], amt); }
+    catch (e) { return out("s5", false, `강제 이전 ${f.toUpperCase()}→${t.toUpperCase()} 사전검사 거부: <b>${esc(errName(e))}</b>`); }
+    await send("s5", `forcedTransfer ${f.toUpperCase()} → ${t.toUpperCase()} ${amt}`, das.forcedTransfer(cfg()[f], cfg()[t], amt)); refresh();
+  } catch (e) { out("s5", false, esc(errName(e))); }
+};
+</script>
+</body>
+</html>
