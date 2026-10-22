@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>did:webvh × 컨트랙트 연결 (Sepolia)</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14171c;--sub:#5b6472;--line:#dde1e7;--acc:#1f5fbf;--ok:#16794a;--bad:#b3261e;--code:#f1f3f6;--warn:#8a5a00}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1a1e24;--ink:#e8ebf0;--sub:#9aa3b0;--line:#2c323b;--acc:#6aa2ff;--ok:#4cc38a;--bad:#ff7b72;--code:#22272f;--warn:#e3b341}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+main{max-width:880px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}p.lead{color:var(--sub);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 8px}h2 small{color:var(--sub);font-weight:400}
+.btn{display:inline-block;margin:8px 8px 0 0;border:0;background:var(--acc);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+.btn.ghost{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.note{color:var(--sub);font-size:13px;margin:4px 0}
+ul.steps{list-style:none;padding:0;margin:10px 0 0;font-size:14px}ul.steps li{padding:2px 0;word-break:break-all}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+code,.mono{font:12px ui-monospace,Menlo,monospace;word-break:break-all}
+label.chk{display:block;margin-top:8px;font-size:14px}
+a{color:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+<h1>did:webvh × 컨트랙트 연결</h1>
+<p class="lead">Sepolia 테스트넷에서 OnchainIdRegistry · TokenSecurity · DidWebvhAnchor 를 배포하고, did:webvh VP 가 검증될 때만 KYC 클레임을 등록합니다. <a href="./index.html">← 지갑으로</a></p>
+
+<div class="card">
+  <h2>0. MetaMask 연결</h2>
+  <p class="note">이 지갑이 배포자(owner)·운영자(agent)·보유자 지갑 역할을 모두 합니다. Sepolia 테스트 ETH 가 필요합니다.</p>
+  <button class="btn" id="connect">MetaMask 연결</button>
+  <ul class="steps" id="s0"></ul>
+</div>
+
+<div class="card">
+  <h2>1. 컨트랙트 배포 <small>(트랜잭션 5회)</small></h2>
+  <p class="note">기존 da-contracts 소스를 수정 없이 컴파일한 OnchainIdRegistry · TokenSecurity 와 새 DidWebvhAnchor 를 배포하고 agent 권한을 부여합니다. 한 번 배포하면 이 브라우저에 주소가 저장됩니다.</p>
+  <button class="btn" id="deploy" disabled>배포</button>
+  <button class="btn ghost" id="forget">저장된 주소 지우기</button>
+  <ul class="steps" id="s1"></ul>
+</div>
+
+<div class="card">
+  <h2>2. 연결 전 상태</h2>
+  <button class="btn ghost" id="before" disabled>isVerified / 발급 시뮬레이션</button>
+  <ul class="steps" id="s2"></ul>
+</div>
+
+<div class="card">
+  <h2>3. 브리지: VP 검증 → 통과 시에만 온체인 등록</h2>
+  <p class="note">지갑(같은 사이트)에 보관된 VC 로 VP 를 만들고 — challenge 에 MetaMask 주소가 들어갑니다 — 두 DID 로그를 웹에서 받아 검증합니다. 하나라도 실패하면 트랜잭션을 보내지 않습니다.</p>
+  <label class="chk"><input type="checkbox" id="tamper"> 실패 테스트: VC 의 이름을 변조해서 제출</label>
+  <label class="chk"><input type="checkbox" id="badchal"> 실패 테스트: 다른 지갑 주소가 들어간 challenge 로 제출</label>
+  <button class="btn" id="bridge" disabled>검증 후 등록</button>
+  <ul class="steps" id="s3"></ul>
+</div>
+
+<div class="card">
+  <h2>4. 연결 후: 토큰 게이트</h2>
+  <button class="btn" id="mint" disabled>토큰증권 100 DAS 발행 → 내 지갑</button>
+  <button class="btn ghost" id="strangerTx" disabled>미검증 주소로 전송 시뮬레이션</button>
+  <ul class="steps" id="s4"></ul>
+</div>
+
+<div class="card">
+  <h2>5. 롤백 탐지 <small>(가스 없음)</small></h2>
+  <p class="note">발급자 로그를 v1 까지만 받은 상황을 만들어, 온체인 앵커와 비교합니다.</p>
+  <button class="btn ghost" id="rollback" disabled>롤백 시뮬레이션</button>
+  <ul class="steps" id="s5"></ul>
+</div>
+
+<div class="card">
+  <h2>6. 클레임 회수</h2>
+  <button class="btn ghost" id="revoke" disabled>KYC 클레임 회수</button>
+  <ul class="steps" id="s6"></ul>
+</div>
+</main>
+
+<script type="module">
+import * as ed from "./vendor/noble-ed25519-2.1.0.js";
+import { ethers } from "./vendor/ethers-6.13.4.min.js";
+import { makeKit } from "./webvh.js";
+const K = makeKit(ed);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const SEPOLIA = 11155111n, SCAN = "https://sepolia.etherscan.io";
+const TRUSTED_ISSUERS = ["did:webvh:QmbHiA5e4ZyPNMvMH17ba4gz4zDLAGBm4y9hxLkmqBYDt9:sylas0903.github.io:didwebvh-demo:issuer"];
+const ACCEPTED_TYPES = ["DemoParticipationCredential", "KycCredential"];
+const ADDR_KEY = "didwebvh-demo-sepolia";
+let provider, signer, me, ART, C = {};
+
+function clearPending(id) { const l = $(id).lastElementChild; if (l && l.classList.contains("warn")) l.remove(); }
+function out(id, ok, html) { if (ok !== null) clearPending(id); $(id).insertAdjacentHTML("beforeend", `<li class="${ok === true ? "ok" : ok === false ? "bad" : "warn"}">${ok === true ? "✔" : ok === false ? "✘" : "…"} ${html}</li>`); }
+const txLink = (h) => `<a href="${SCAN}/tx/${h}" target="_blank" rel="noopener">tx</a>`;
+const addrLink = (a) => `<a href="${SCAN}/address/${a}" target="_blank" rel="noopener"><span class="mono">${a}</span></a>`;
+function loadAddrs() { try { return JSON.parse(localStorage.getItem(ADDR_KEY)) || null; } catch { return null; } }
+function saveAddrs(a) { try { localStorage.setItem(ADDR_KEY, JSON.stringify(a)); } catch {} }
+function wallet() { try { return JSON.parse(localStorage.getItem("didwebvh-demo-wallet")) || {}; } catch { return {}; } }
+function errName(e) {
+  const data = e?.data || e?.info?.error?.data || e?.error?.data;
+  for (const name of ["OnchainIdRegistry", "TokenSecurity", "DidWebvhAnchor"]) {
+    try { const p = new ethers.Interface(ART[name].abi).parseError(data); if (p) return p.name; } catch {}
+  }
+  return e?.shortMessage || e?.message || String(e);
+}
+async function send(id, label, p) {
+  out(id, null, `${esc(label)} — MetaMask 에서 승인해 주세요`);
+  const tx = await p; const rc = await tx.wait();
+  $(id).lastElementChild.remove(); out(id, true, `${esc(label)} ${txLink(rc.hash)}`); return rc;
+}
+function attach(addrs) {
+  C.reg = new ethers.Contract(addrs.reg, ART.OnchainIdRegistry.abi, signer);
+  C.das = new ethers.Contract(addrs.das, ART.TokenSecurity.abi, signer);
+  C.anc = new ethers.Contract(addrs.anc, ART.DidWebvhAnchor.abi, signer);
+  for (const b of ["before", "bridge", "mint", "strangerTx", "rollback", "revoke"]) $(b).disabled = false;
+}
+
+$("connect").onclick = async () => {
+  $("s0").innerHTML = "";
+  try {
+    if (!window.ethereum) throw new Error("MetaMask 가 없습니다");
+    ART = await (await fetch("./contracts.json")).json();
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    if ((await provider.getNetwork()).chainId !== SEPOLIA) {
+      await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xaa36a7" }] });
+      provider = new ethers.BrowserProvider(window.ethereum);
+    }
+    signer = await provider.getSigner(); me = await signer.getAddress();
+    const bal = await provider.getBalance(me);
+    out("s0", true, `연결됨: ${addrLink(me)} (Sepolia, ${ethers.formatEther(bal).slice(0, 7)} ETH)`);
+    if (bal === 0n) out("s0", false, "테스트 ETH 가 없습니다. Sepolia faucet 에서 받아 주세요.");
+    const w = wallet();
+    out("s0", !!w.did, w.did ? `지갑의 did:webvh: <span class="mono">${esc(w.did)}</span>` : "같은 브라우저 지갑에 DID 가 없습니다 (지갑 페이지에서 먼저 진행)");
+    out("s0", !!(w.vcs && w.vcs.length), w.vcs && w.vcs.length ? `보관 VC ${w.vcs.length}개` : "보관된 VC 가 없습니다");
+    $("deploy").disabled = false;
+    const a = loadAddrs();
+    if (a && a.chainId === "11155111" && a.owner === me) { attach(a); out("s1", true, `저장된 배포 사용: Registry ${addrLink(a.reg)}`); }
+  } catch (e) { out("s0", false, esc(e.message || e)); }
+};
+$("forget").onclick = () => { try { localStorage.removeItem(ADDR_KEY); } catch {} $("s1").innerHTML = ""; out("s1", true, "저장된 주소를 지웠습니다"); };
+
+$("deploy").onclick = async () => {
+  $("s1").innerHTML = "";
+  try {
+    const dep = async (name, ...args) => {
+      const f = new ethers.ContractFactory(ART[name].abi, ART[name].bytecode, signer);
+      out("s1", null, `${name} 배포 — MetaMask 승인`);
+      const c = await f.deploy(...args); await c.waitForDeployment();
+      $("s1").lastElementChild.remove(); const addr = await c.getAddress();
+      out("s1", true, `${name}: ${addrLink(addr)}`); return addr;
+    };
+    const reg = await dep("OnchainIdRegistry", me);
+    const das = await dep("TokenSecurity", "Demo Asset Security", "DAS", me, reg);
+    const anc = await dep("DidWebvhAnchor", me);
+    const a = { chainId: "11155111", owner: me, reg, das, anc }; attach(a);
+    await send("s1", "TokenSecurity.addAgent(나)", C.das.addAgent(me));
+    await send("s1", "DidWebvhAnchor.addAgent(나)", C.anc.addAgent(me));
+    saveAddrs(a); out("s1", true, "배포 완료 — Registry 는 owner(나) 가 직접 등록 권한을 가집니다");
+  } catch (e) { out("s1", false, esc(errName(e))); }
+};
+
+$("before").onclick = async () => {
+  $("s2").innerHTML = "";
+  const v = await C.reg.isVerified(me); out("s2", !v, `isVerified(내 지갑) = ${v}`);
+  try { await C.das.mint.staticCall(me, 100); out("s2", false, "발급 시뮬레이션: 통과(예상과 다름)"); }
+  catch (e) { out("s2", true, `토큰증권 발행 시뮬레이션 → 거부: <b>${esc(errName(e))}</b>`); }
+};
+
+async function verifyVp(vp, expectedChallenge, steps) {
+  if (vp.proof.challenge !== expectedChallenge) throw new Error("VP challenge 불일치 (다른 지갑/재사용)");
+  steps("VP challenge = 이 MetaMask 주소 + 1회용 nonce");
+  const h = await K.resolve(vp.holder); steps(`보유자 DID 해석: ${h.url} (${h.steps.join(", ")})`);
+  if (!(await K.diVerify(vp, vp.proof, K.findVm(h.doc, vp.proof.verificationMethod, "authentication")))) throw new Error("VP 서명 불일치");
+  steps("VP 서명 검증 → DID 키 보유 + 이 지갑과의 연결 동의");
+  const vc = vp.verifiableCredential[0];
+  if (!TRUSTED_ISSUERS.includes(vc.issuer)) throw new Error("신뢰 목록 밖 발급자");
+  if (!vc.type.some(t => ACCEPTED_TYPES.includes(t))) throw new Error("허용되지 않는 VC 유형");
+  if (vc.credentialSubject.id !== vp.holder) throw new Error("VC 주체 ≠ 제출자");
+  const i = await K.resolve(vc.issuer); steps(`발급자 DID 해석 (신뢰 목록 포함): ${i.url} (${i.steps.join(", ")})`);
+  if (!(await K.diVerify(vc, vc.proof, K.findVm(i.doc, vc.proof.verificationMethod, "assertionMethod")))) throw new Error("VC 서명 불일치 (내용 변조)");
+  steps("VC 서명 검증");
+  return { holder: vp.holder, hv: h.versionId, issuer: vc.issuer, iv: i.versionId, vc };
+}
+
+$("bridge").onclick = async () => {
+  $("s3").innerHTML = "";
+  const step = (t) => out("s3", true, esc(t));
+  try {
+    const w = wallet(); if (!w.sk || !w.vcs?.length) throw new Error("지갑에 DID 키/VC 가 없습니다");
+    // 보유자 측: challenge 받아 VP 생성 (지갑 키는 이 브라우저에만 있음)
+    const nonce = ethers.hexlify(ethers.randomBytes(8)).slice(2);
+    const expected = `kyc-bind:11155111:${me}:${nonce}`;
+    const usedChal = $("badchal").checked ? `kyc-bind:11155111:${ethers.Wallet.createRandom().address}:${nonce}` : expected;
+    const key = await K.keyFromSecret(w.sk);
+    let vc = K.clone(w.vcs[w.vcs.length - 1]);
+    if ($("tamper").checked) vc.credentialSubject.name = vc.credentialSubject.name + "(변조)";
+    const vp = { "@context": ["https://www.w3.org/ns/credentials/v2"], type: ["VerifiablePresentation"], holder: w.did, verifiableCredential: [vc] };
+    vp.proof = await K.diSign(vp, key.sk, { verificationMethod: w.vm, proofPurpose: "authentication", challenge: usedChal, domain: location.host });
+    out("s3", true, "보유자: VP 생성 (지갑 키로 서명)");
+    // 브리지 측 검증
+    const v = await verifyVp(vp, expected, step);
+    // 지갑 측 동의 서명 (MetaMask)
+    const msg = `did:webvh wallet binding\nDID: ${v.holder}\nWallet: ${me}\nChallenge: ${expected}`;
+    out("s3", null, "MetaMask: 지갑↔DID 연결 메시지 서명");
+    const sig = await signer.signMessage(msg); $("s3").lastElementChild.remove();
+    if (ethers.verifyMessage(msg, sig) !== me) throw new Error("지갑 서명 불일치");
+    step("지갑 서명 검증 → 지갑 키 보유 + DID 연결 동의");
+    // 온체인 등록 (기존 함수 그대로)
+    const vcHash = ethers.sha256(ethers.toUtf8Bytes(K.jcs(v.vc)));
+    const data = ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "bytes32", "bytes32", "string"],
+      [ethers.id(v.holder), vcHash, ethers.id(v.issuer), v.iv]);
+    const uid = ethers.sha256(ethers.toUtf8Bytes(v.holder));
+    const exists = (await C.reg.identityOf(me))[2];
+    if (!exists) await send("s3", "OnchainIdRegistry.addIdentity", C.reg.addIdentity(me, uid, 410));
+    const validTo = BigInt(Math.floor(Date.now() / 1000) + 730 * 86400);
+    await send("s3", "OnchainIdRegistry.addClaim(KYC, data=DID·VC 해시·발급자 versionId)", C.reg.addClaim(me, 1, sig, data, validTo));
+    if (!(await C.anc.didOf(me))) await send("s3", "DidWebvhAnchor.linkDid", C.anc.linkDid(me, v.holder));
+    const anchorIfNewer = async (did, vid, label) => {
+      const n = BigInt(vid.split("-")[0]); const [cur] = await C.anc.anchorOf(did);
+      if (n > cur) await send("s3", `anchorVersion(${label} v${n})`, C.anc.anchorVersion(did, n, vid)); else step(`${label} 앵커 최신 (v${cur})`);
+    };
+    await anchorIfNewer(v.holder, v.hv, "보유자"); await anchorIfNewer(v.issuer, v.iv, "발급자");
+    out("s3", true, `<b>등록 완료 — isVerified = ${await C.reg.isVerified(me)}</b>`);
+  } catch (e) {
+    out("s3", false, `${esc(errName(e))}`);
+    out("s3", true, `<b>온체인 등록 없음 — isVerified = ${await C.reg.isVerified(me)}</b>`);
+  }
+};
+
+$("mint").onclick = async () => {
+  try { await send("s4", "TokenSecurity.mint(내 지갑, 100)", C.das.mint(me, 100)); out("s4", true, `잔액: ${await C.das.balanceOf(me)} DAS`); }
+  catch (e) { out("s4", false, `발행 거부: <b>${esc(errName(e))}</b>`); }
+};
+$("strangerTx").onclick = async () => {
+  const stranger = ethers.Wallet.createRandom().address;
+  try { await C.das.transfer.staticCall(stranger, 1); out("s4", false, "미검증 주소 전송이 통과됨(예상과 다름)"); }
+  catch (e) { out("s4", true, `미검증 주소 <span class="mono">${stranger.slice(0, 10)}…</span> 로 전송 → 거부: <b>${esc(errName(e))}</b>`); }
+};
+
+$("rollback").onclick = async () => {
+  $("s5").innerHTML = "";
+  try {
+    const iss = TRUSTED_ISSUERS[0];
+    const full = (await (await fetch(K.logUrl(iss), { cache: "no-store" })).text()).trim().split("\n");
+    const old = await K.verifyLog(full[0] + "\n", iss);
+    out("s5", true, `v1 까지만 받은 로그도 자체 검증은 통과 (${old.steps.join(", ")})`);
+    const [n, vid] = await C.anc.anchorOf(iss);
+    const got = BigInt(old.versionId.split("-")[0]);
+    out("s5", got < n, got < n ? `받은 로그 v${got} < 온체인 앵커 v${n} → <b>롤백으로 판정, 거부</b>` : `앵커가 없거나 같음 (온체인 v${n}) — 3단계를 먼저 실행하세요`);
+  } catch (e) { out("s5", false, esc(errName(e))); }
+};
+
+$("revoke").onclick = async () => {
+  try {
+    await send("s6", "OnchainIdRegistry.revokeClaim(KYC)", C.reg.revokeClaim(me, 1));
+    out("s6", true, `isVerified = ${await C.reg.isVerified(me)}`);
+    try { await C.das.mint.staticCall(me, 1); out("s6", false, "회수 후에도 발행 통과(예상과 다름)"); }
+    catch (e) { out("s6", true, `회수 후 발행 시뮬레이션 → 거부: <b>${esc(errName(e))}</b>`); }
+  } catch (e) { out("s6", false, esc(errName(e))); }
+};
+</script>
+</body>
+</html>
