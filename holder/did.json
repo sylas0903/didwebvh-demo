@@ -9,7 +9,7 @@
       "id": "did:web:sylas0903.github.io:didwebvh-demo:holder#key-1",
       "type": "Multikey",
       "controller": "did:web:sylas0903.github.io:didwebvh-demo:holder",
-      "publicKeyMultibase": "z6MkqWKQpt2ZzSbBbEVySE5mm7A6WSNySFaiuWUWX7azeYMT"
+      "publicKeyMultibase": "z6MkohCU6SxmbM7fSB1J9Sf6bBWTF8r7GCgt9y3iHcU6L1SQ"
     }
   ],
   "authentication": [
@@ -19,6 +19,6 @@
     "did:web:sylas0903.github.io:didwebvh-demo:holder#key-1"
   ],
   "alsoKnownAs": [
-    "did:webvh:QmQKwyDZE2d23YioAYqpuHyxgJqWC7Ur2gHAYZShitz8wJ:sylas0903.github.io:didwebvh-demo:holder"
+    "did:webvh:Qmad7wSz18mHMEdfiBFuuYrYHFdXdFebzTGzy51JyYxXkE:sylas0903.github.io:didwebvh-demo:holder"
   ]
 }
