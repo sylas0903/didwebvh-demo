@@ -108,6 +108,7 @@ const SEPOLIA = 11155111n, SCAN = "https://sepolia.etherscan.io";
 const TRUSTED_ISSUERS = ["did:webvh:QmbHiA5e4ZyPNMvMH17ba4gz4zDLAGBm4y9hxLkmqBYDt9:sylas0903.github.io:didwebvh-demo:issuer"];
 const ACCEPTED_TYPES = ["DemoParticipationCredential", "KycCredential"];
 const ADDR_KEY = "didwebvh-demo-sepolia";
+const fmt = (v) => { const s = ethers.formatUnits(v, 18); const n = Number(s); return n !== 0 && Math.abs(n) < 0.0001 ? s : n.toLocaleString("ko-KR", { maximumFractionDigits: 4 }); };
 let provider, signer, me, ART, C = {};
 
 function clearPending(id) { const l = $(id).lastElementChild; if (l && l.classList.contains("warn")) l.remove(); }
@@ -250,14 +251,14 @@ $("bridge").onclick = async () => {
 };
 
 $("mint").onclick = async () => {
-  try { await send("s4", "TokenSecurity.mint(내 지갑, 100)", C.das.mint(me, 100)); out("s4", true, `잔액: ${await C.das.balanceOf(me)} DAS`); }
+  try { await send("s4", "TokenSecurity.mint(내 지갑, 100 DAS)", C.das.mint(me, ethers.parseUnits("100", 18))); out("s4", true, `잔액: ${fmt(await C.das.balanceOf(me))} DAS`); }
   catch (e) { out("s4", false, `발행 거부: <b>${esc(errName(e))}</b>`); }
 };
 $("watch").onclick = async () => {
   try {
     const ok = await window.ethereum.request({ method: "wallet_watchAsset",
       params: { type: "ERC20", options: { address: await C.das.getAddress(), symbol: "DAS", decimals: 18 } } });
-    out("s4", ok ? true : false, ok ? "MetaMask 에 DAS 추가됨 (Sepolia 네트워크에서 표시, 100 은 최소단위라 아주 작은 수로 보임)" : "추가가 취소되었습니다");
+    out("s4", ok ? true : false, ok ? "MetaMask 에 DAS 추가됨 (Sepolia 네트워크에서 표시)" : "추가가 취소되었습니다");
   } catch (e) { out("s4", false, esc(e.message || e)); }
 };
 function toAddr() { const a = $("toAddr").value.trim(); if (!ethers.isAddress(a)) throw new Error("올바른 주소가 아닙니다"); return ethers.getAddress(a); }
@@ -265,16 +266,16 @@ $("toCheck").onclick = async () => {
   try {
     const to = toAddr();
     const [v, bal, mine, did] = await Promise.all([C.reg.isVerified(to), C.das.balanceOf(to), C.das.balanceOf(me), C.anc.didOf(to)]);
-    out("s42", v, `수신자 isVerified = ${v}, 수신자 잔액 ${bal} DAS / 내 잔액 ${mine} DAS${did ? ", 연결 DID: " + esc(did) : ""}`);
+    out("s42", v, `수신자 isVerified = ${v}, 수신자 잔액 ${fmt(bal)} DAS / 내 잔액 ${fmt(mine)} DAS${did ? ", 연결 DID: " + esc(did) : ""}`);
   } catch (e) { out("s42", false, esc(errName(e))); }
 };
 $("toSend").onclick = async () => {
   try {
-    const to = toAddr(); const amt = BigInt($("toAmt").value.trim());
+    const to = toAddr(); const amt = ethers.parseUnits($("toAmt").value.trim(), 18);
     try { await C.das.transfer.staticCall(to, amt); }
     catch (e) { out("s42", false, `전송 사전검사 → 거부: <b>${esc(errName(e))}</b> (트랜잭션 보내지 않음)`); return; }
-    await send("s42", `TokenSecurity.transfer(${to.slice(0, 10)}…, ${amt})`, C.das.transfer(to, amt));
-    out("s42", true, `내 잔액 ${await C.das.balanceOf(me)} / 수신자 잔액 ${await C.das.balanceOf(to)} DAS`);
+    await send("s42", `TokenSecurity.transfer(${to.slice(0, 10)}…, ${fmt(amt)} DAS)`, C.das.transfer(to, amt));
+    out("s42", true, `내 잔액 ${fmt(await C.das.balanceOf(me))} / 수신자 잔액 ${fmt(await C.das.balanceOf(to))} DAS`);
   } catch (e) { out("s42", false, esc(errName(e))); }
 };
 $("toReg").onclick = async () => {

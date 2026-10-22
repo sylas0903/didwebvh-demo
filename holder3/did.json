@@ -1,0 +1,24 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/multikey/v1"
+  ],
+  "id": "did:web:sylas0903.github.io:didwebvh-demo:holder3",
+  "verificationMethod": [
+    {
+      "id": "did:web:sylas0903.github.io:didwebvh-demo:holder3#key-1",
+      "type": "Multikey",
+      "controller": "did:web:sylas0903.github.io:didwebvh-demo:holder3",
+      "publicKeyMultibase": "z6MksRecZWoPrWHsHWZ4sv25iARRkMcELXbeAxhehxm5LZkh"
+    }
+  ],
+  "authentication": [
+    "did:web:sylas0903.github.io:didwebvh-demo:holder3#key-1"
+  ],
+  "assertionMethod": [
+    "did:web:sylas0903.github.io:didwebvh-demo:holder3#key-1"
+  ],
+  "alsoKnownAs": [
+    "did:webvh:QmbTYxP4rsEcqoQVzrN9MJ7NarxWKXB5FsVoSuNCCzi4G5:sylas0903.github.io:didwebvh-demo:holder3"
+  ]
+}

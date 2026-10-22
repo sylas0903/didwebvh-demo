@@ -25,6 +25,17 @@ ul.steps{list-style:none;padding:0;margin:10px 0 0;font-size:14px}ul.steps li{pa
 .mono{font:12px ui-monospace,Menlo,monospace;word-break:break-all}
 table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}th,td{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left}
 th{color:var(--sub);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+.bal{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;position:relative}
+.bal.me{outline:2px solid var(--acc)}
+.bal .r{font-size:13px;color:var(--sub);font-weight:600}.bal .a{font:12px ui-monospace,Menlo,monospace;color:var(--sub)}
+.bal .n{font-size:34px;font-weight:700;line-height:1.15;margin:8px 0 2px;font-variant-numeric:tabular-nums}
+.bal .n small{font-size:15px;font-weight:600;color:var(--sub);margin-left:4px}
+.bal .d{font-size:13px;font-weight:600;margin-left:6px}.bal .d.up{color:var(--ok)}.bal .d.down{color:var(--bad)}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-top:6px}
+.badge.on{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}.badge.off{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.bal .e{font-size:12px;color:var(--sub);margin-top:6px}
+.flash{animation:fl 1.2s ease}@keyframes fl{0%{background:color-mix(in srgb,var(--acc) 22%,var(--card))}100%{background:var(--card)}}
 #who{position:sticky;top:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px}
 a{color:var(--acc)}
 </style>
@@ -36,6 +47,8 @@ a{color:var(--acc)}
 
 <div id="who">현재 MetaMask 계정: <b id="cur">연결 안 됨</b> <span id="curRole"></span>
   <button class="btn ghost" id="connect" style="margin:0 0 0 8px;padding:4px 10px">연결</button></div>
+
+<div class="cards" id="cards"></div>
 
 <div class="card">
   <h2>0. 계정·컨트랙트 설정</h2>
@@ -109,6 +122,8 @@ const SCAN = "https://sepolia.etherscan.io";
 const TRUSTED_ISSUERS = ["did:webvh:QmbHiA5e4ZyPNMvMH17ba4gz4zDLAGBm4y9hxLkmqBYDt9:sylas0903.github.io:didwebvh-demo:issuer"];
 const ACCEPTED_TYPES = ["DemoParticipationCredential", "KycCredential"];
 const CFG_KEY = "didwebvh-demo-roles";
+const fmt = (v) => { const s = ethers.formatUnits(v, 18); const n = Number(s); return n !== 0 && Math.abs(n) < 0.0001 ? s : n.toLocaleString("ko-KR", { maximumFractionDigits: 4 }); };
+const PREV = {};
 let ART, provider, cur = null;
 const SUB = {};   // 투자자 제출물 (VP + 지갑 서명), 페이지 메모리에만 보관
 
@@ -158,7 +173,9 @@ async function updateWho() {
   $("regAddr").value = saved.reg || dep.reg || ""; $("dasAddr").value = saved.das || dep.das || ""; $("ancAddr").value = saved.anc || dep.anc || "";
   if (saved.aProf && p.includes(saved.aProf)) $("aProf").value = saved.aProf;
   if (saved.bProf && p.includes(saved.bProf)) $("bProf").value = saved.bProf; else if (p.length > 1) $("bProf").value = p[1];
-  if (window.ethereum) { provider = new ethers.BrowserProvider(window.ethereum); window.ethereum.on?.("accountsChanged", updateWho); updateWho(); }
+  if (window.ethereum) { provider = new ethers.BrowserProvider(window.ethereum); window.ethereum.on?.("accountsChanged", async () => { await updateWho(); refresh(); }); await updateWho(); }
+  if (saved.reg) refresh();
+  setInterval(() => { if (document.visibilityState === "visible" && lsGet(CFG_KEY)) refresh(); }, 12000);
 })();
 $("connect").onclick = async () => {
   try {
@@ -186,9 +203,19 @@ async function refresh() {
     const html = await Promise.all(rows.map(async ([r, a]) => {
       if (!ethers.isAddress(a)) return `<tr><td>${r}</td><td colspan="5">-</td></tr>`;
       const [v, bal, eth, did] = await Promise.all([reg.isVerified(a), das.balanceOf(a), provider.getBalance(a), anc.didOf(a)]);
-      return `<tr><td>${r}</td><td class="mono">${short(a)}</td><td class="${v ? "ok" : "bad"}">${v}</td><td>${bal}</td><td>${ethers.formatEther(eth).slice(0, 7)}</td><td class="mono">${did ? esc(did.split(":")[2].slice(0, 10) + "…:" + did.split(":").pop()) : "-"}</td></tr>`;
+      return `<tr><td>${r}</td><td class="mono">${short(a)}</td><td class="${v ? "ok" : "bad"}">${v}</td><td>${fmt(bal)}</td><td>${ethers.formatEther(eth).slice(0, 7)}</td><td class="mono">${did ? esc(did.split(":")[2].slice(0, 10) + "…:" + did.split(":").pop()) : "-"}</td></tr>`;
     }));
     $("tbl").innerHTML = html.join("");
+    const data = await Promise.all(rows.map(async ([r, a]) => ethers.isAddress(a) ? { r, a, v: await reg.isVerified(a), bal: await das.balanceOf(a), eth: await provider.getBalance(a) } : null));
+    $("cards").innerHTML = data.filter(Boolean).map(x => {
+      const prev = PREV[x.a]; const diff = prev === undefined ? 0n : x.bal - prev; PREV[x.a] = x.bal;
+      const isMe = cur && cur.toLowerCase() === x.a.toLowerCase();
+      return `<div class="bal ${isMe ? "me" : ""} ${diff !== 0n ? "flash" : ""}">
+        <div class="r">${x.r}${isMe ? " · 현재 MetaMask" : ""}</div><div class="a">${short(x.a)}</div>
+        <div class="n">${fmt(x.bal)}<small>DAS</small>${diff !== 0n ? `<span class="d ${diff > 0n ? "up" : "down"}">${diff > 0n ? "+" : ""}${fmt(diff)}</span>` : ""}</div>
+        <span class="badge ${x.v ? "on" : "off"}">${x.v ? "KYC 유효" : "KYC 없음 · 거래 불가"}</span>
+        <div class="e">가스 ${ethers.formatEther(x.eth).slice(0, 7)} SepoliaETH</div></div>`;
+    }).join("");
   } catch (e) { $("tbl").innerHTML = `<tr><td colspan="6" class="bad">${esc(errName(e))}</td></tr>`; }
 }
 $("refresh").onclick = refresh;
@@ -265,9 +292,9 @@ $("opReg").onclick = async () => {
 $("mint").onclick = async () => {
   const w = $("who3").value;
   try {
-    const s = await signerAs("op"); const { das } = contracts(s); const to = cfg()[w]; const amt = BigInt($("mintAmt").value);
+    const s = await signerAs("op"); const { das } = contracts(s); const to = cfg()[w]; const amt = ethers.parseUnits($("mintAmt").value, 18);
     try { await das.mint.staticCall(to, amt); } catch (e) { return out("s3", false, `사전검사 거부: <b>${esc(errName(e))}</b> (트랜잭션 보내지 않음)`); }
-    await send("s3", `mint → 투자자 ${w.toUpperCase()} ${amt}`, das.mint(to, amt)); refresh();
+    await send("s3", `mint → 투자자 ${w.toUpperCase()} ${fmt(amt)} DAS`, das.mint(to, amt)); refresh();
   } catch (e) { out("s3", false, esc(errName(e))); }
 };
 
@@ -275,10 +302,10 @@ $("mint").onclick = async () => {
 $("xfer").onclick = async () => {
   const [f, t] = $("dir").value.split("");
   try {
-    const s = await signerAs(f); const { das } = contracts(s); const to = cfg()[t]; const amt = BigInt($("xAmt").value);
+    const s = await signerAs(f); const { das } = contracts(s); const to = cfg()[t]; const amt = ethers.parseUnits($("xAmt").value, 18);
     try { await das.transfer.staticCall(to, amt); }
-    catch (e) { return out("s4", false, `${f.toUpperCase()} → ${t.toUpperCase()} ${amt}: 사전검사 거부 <b>${esc(errName(e))}</b> (트랜잭션 보내지 않음)`); }
-    await send("s4", `${f.toUpperCase()} → ${t.toUpperCase()} ${amt} DAS`, das.transfer(to, amt)); refresh();
+    catch (e) { return out("s4", false, `${f.toUpperCase()} → ${t.toUpperCase()} ${fmt(amt)}: 사전검사 거부 <b>${esc(errName(e))}</b> (트랜잭션 보내지 않음)`); }
+    await send("s4", `${f.toUpperCase()} → ${t.toUpperCase()} ${fmt(amt)} DAS`, das.transfer(to, amt)); refresh();
   } catch (e) { out("s4", false, esc(errName(e))); }
 };
 
@@ -292,10 +319,10 @@ $("revoke").onclick = async () => {
 };
 $("forced").onclick = async () => {
   const [f, t] = $("fdir").value.split("");
-  try { const s = await signerAs("op"); const { das } = contracts(s); const amt = BigInt($("fAmt").value);
+  try { const s = await signerAs("op"); const { das } = contracts(s); const amt = ethers.parseUnits($("fAmt").value, 18);
     try { await das.forcedTransfer.staticCall(cfg()[f], cfg()[t], amt); }
     catch (e) { return out("s5", false, `강제 이전 ${f.toUpperCase()}→${t.toUpperCase()} 사전검사 거부: <b>${esc(errName(e))}</b>`); }
-    await send("s5", `forcedTransfer ${f.toUpperCase()} → ${t.toUpperCase()} ${amt}`, das.forcedTransfer(cfg()[f], cfg()[t], amt)); refresh();
+    await send("s5", `forcedTransfer ${f.toUpperCase()} → ${t.toUpperCase()} ${fmt(amt)} DAS`, das.forcedTransfer(cfg()[f], cfg()[t], amt)); refresh();
   } catch (e) { out("s5", false, esc(errName(e))); }
 };
 </script>
