@@ -52,9 +52,9 @@ a{color:var(--acc)}
 
 <div class="card">
   <h2>0. 계정·컨트랙트 설정</h2>
-  <div class="row"><label>운영자</label><input id="opAddr" class="grow" placeholder="Account 1 주소 (배포한 계정)"></div>
-  <div class="row"><label>투자자 A</label><input id="aAddr" class="grow" placeholder="Account 2 주소"><select id="aProf"></select></div>
-  <div class="row"><label>투자자 B</label><input id="bAddr" class="grow" placeholder="Account 3 주소"><select id="bProf"></select></div>
+  <div class="row"><label>운영자</label><button class="btn ghost fill" data-f="opAddr" style="margin:0;padding:6px 10px">현재 계정 넣기</button><input id="opAddr" class="grow" placeholder="Account 1 주소 (배포한 계정)"></div>
+  <div class="row"><label>투자자 A</label><button class="btn ghost fill" data-f="aAddr" style="margin:0;padding:6px 10px">현재 계정 넣기</button><input id="aAddr" class="grow" placeholder="Account 2 주소"><select id="aProf"></select></div>
+  <div class="row"><label>투자자 B</label><button class="btn ghost fill" data-f="bAddr" style="margin:0;padding:6px 10px">현재 계정 넣기</button><input id="bAddr" class="grow" placeholder="Account 3 주소"><select id="bProf"></select></div>
   <div class="row"><label>Registry</label><input id="regAddr" class="grow"></div>
   <div class="row"><label>DAS 토큰</label><input id="dasAddr" class="grow"></div>
   <div class="row"><label>Anchor</label><input id="ancAddr" class="grow"></div>
@@ -187,6 +187,10 @@ $("connect").onclick = async () => {
     await updateWho();
   } catch (e) { out("s0", false, esc(e.message || e)); }
 };
+document.querySelectorAll(".fill").forEach(b => b.onclick = async () => {
+  await updateWho(); if (!cur) return out("s0", false, "먼저 위쪽 '연결'을 누르세요");
+  $(b.dataset.f).value = cur; out("s0", true, `${b.dataset.f === "opAddr" ? "운영자" : b.dataset.f === "aAddr" ? "투자자 A" : "투자자 B"} = ${cur}`);
+});
 $("saveCfg").onclick = () => {
   const c = cfg(); $("s0").innerHTML = "";
   for (const k of ["op", "a", "b", "reg", "das", "anc"]) if (!ethers.isAddress(c[k])) return out("s0", false, `${k} 주소가 올바르지 않습니다`);
