@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>did:webvh 데모 지갑</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14171c;--sub:#5b6472;--line:#dde1e7;--acc:#1f5fbf;--ok:#16794a;--bad:#b3261e;--code:#f1f3f6}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1a1e24;--ink:#e8ebf0;--sub:#9aa3b0;--line:#2c323b;--acc:#6aa2ff;--ok:#4cc38a;--bad:#ff7b72;--code:#22272f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+main{max-width:880px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}p.lead{color:var(--sub);margin:0 0 20px}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px}
+nav button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+section{display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}section.on{display:block}
+h2{font-size:17px;margin:0 0 12px}label{display:block;font-weight:600;margin:14px 0 6px}
+input,textarea{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:9px 10px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+textarea{min-height:120px;resize:vertical}
+.btn{display:inline-block;margin:12px 8px 0 0;border:0;background:var(--acc);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font:inherit}
+.btn.ghost{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+pre{background:var(--code);border-radius:8px;padding:12px;overflow:auto;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;margin:8px 0 0}
+.note{color:var(--sub);font-size:13px}.ok{color:var(--ok)}.bad{color:var(--bad)}
+ul.steps{padding-left:0;list-style:none;margin:10px 0 0}ul.steps li{padding:3px 0}
+.did{font:12px ui-monospace,Menlo,monospace;word-break:break-all;background:var(--code);padding:8px;border-radius:6px}
+</style>
+</head>
+<body>
+<main>
+<h1>did:webvh 데모 지갑</h1>
+<p class="lead">개인키는 이 브라우저 안에서만 만들어지고 저장됩니다. DID 로그는 이 사이트(GitHub Pages)에 공개됩니다.</p>
+<nav>
+  <button data-t="t1" class="on">① 내 DID</button>
+  <button data-t="t2">② 발급 요청</button>
+  <button data-t="t3">③ 받은 VC</button>
+  <button data-t="t4">④ 제출(VP)</button>
+  <button data-t="t5">검증자</button>
+</nav>
+
+<section id="t1" class="on">
+  <h2>내 did:webvh 만들기</h2>
+  <div id="didbox"></div>
+  <label>호스팅 경로</label>
+  <input id="hostpath">
+  <p class="note">이 경로 아래 <code>did.jsonl</code>이 올라가면 누구나 이 DID를 해석할 수 있습니다.</p>
+  <button class="btn" id="mk">새 키 + DID 생성</button>
+  <button class="btn ghost" id="chk">공개 여부 확인</button>
+  <button class="btn ghost" id="exp">키 백업 보기</button>
+  <div id="pub"></div>
+</section>
+
+<section id="t2">
+  <h2>발급 요청 만들기</h2>
+  <p class="note">발급자가 준 nonce를 넣으면, 내 DID 키로 서명한 요청이 만들어집니다. 발급자는 이 서명으로 "요청자가 이 DID의 키를 가졌는지"를 확인합니다.</p>
+  <label>발급자 nonce</label><input id="nonce" placeholder="발급자에게 받은 값">
+  <label>이름 (자기 신고)</label><input id="claimName" placeholder="예: 홍길동">
+  <button class="btn" id="mkreq">서명된 요청 생성</button>
+  <pre id="reqOut"></pre>
+  <button class="btn ghost" id="cpreq" style="display:none">복사</button>
+</section>
+
+<section id="t3">
+  <h2>받은 VC 보관</h2>
+  <label>발급받은 VC(JSON) 붙여넣기</label><textarea id="vcIn"></textarea>
+  <button class="btn" id="savevc">검증 후 보관</button>
+  <ul class="steps" id="vcSteps"></ul>
+  <div id="vcList"></div>
+</section>
+
+<section id="t4">
+  <h2>검증자에게 제출할 VP 만들기</h2>
+  <p class="note">검증자가 준 challenge를 넣으면, 보관한 VC를 감싸 내 키로 서명합니다. 재사용 공격을 막기 위한 값입니다.</p>
+  <label>검증자 challenge</label><input id="chal">
+  <button class="btn" id="mkvp">VP 생성</button>
+  <pre id="vpOut"></pre>
+  <button class="btn ghost" id="cpvp" style="display:none">복사</button>
+</section>
+
+<section id="t5">
+  <h2>검증자</h2>
+  <p class="note">challenge를 만들어 보유자에게 주고, 돌아온 VP를 붙여넣으면 두 DID의 로그를 웹에서 직접 받아 검증합니다.</p>
+  <button class="btn ghost" id="newchal">challenge 생성</button> <span id="chalShow" class="did" style="display:none"></span>
+  <label>VP(JSON) 붙여넣기</label><textarea id="vpIn"></textarea>
+  <button class="btn" id="verify">검증</button>
+  <ul class="steps" id="vSteps"></ul>
+</section>
+</main>
+
+<script type="module">
+import * as ed from "./vendor/noble-ed25519-2.1.0.js";
+import { makeKit } from "./webvh.js";
+const K = makeKit(ed);
+const $ = (id) => document.getElementById(id);
+const ST = "didwebvh-demo-wallet";
+const load = () => { try { return JSON.parse(localStorage.getItem(ST)) || {}; } catch { return {}; } };
+const save = (w) => { try { localStorage.setItem(ST, JSON.stringify(w)); } catch { alertBox("브라우저 저장소를 쓸 수 없습니다. 키 백업을 꼭 보관하세요."); } };
+let W = load();
+const siteBase = location.host + location.pathname.replace(/\/[^/]*$/, "");
+$("hostpath").value = W.hostPath || (siteBase + "/holder");
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function alertBox(m){ $("pub").innerHTML = `<p class="bad">${esc(m)}</p>`; }
+function li(ok, t){ return `<li class="${ok ? "ok" : "bad"}">${ok ? "✔" : "✘"} ${esc(t)}</li>`; }
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button,section").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); $(b.dataset.t).classList.add("on");
+});
+function renderDid(){
+  $("didbox").innerHTML = W.did ? `<label>내 DID</label><div class="did">${esc(W.did)}</div>` : `<p class="note">아직 DID가 없습니다.</p>`;
+  $("vcList").innerHTML = (W.vcs||[]).map((v,i)=>`<label>보관 VC #${i+1} — ${esc(v.type.join(", "))}</label><pre>${esc(JSON.stringify(v.credentialSubject,null,2))}</pre>`).join("");
+}
+renderDid();
+const copyBtn = (btn, pre) => { btn.style.display="inline-block"; btn.onclick = () => navigator.clipboard.writeText($(pre).textContent); };
+
+$("mk").onclick = async () => {
+  if (W.did && !confirm("기존 DID와 키를 덮어씁니다. 계속할까요?")) return;
+  const key = await K.newKey();
+  const hp = $("hostpath").value.trim();
+  const r = await K.createDid(hp, key);
+  W = { hostPath: hp, did: r.did, vm: r.vm, sk: K.b58enc(key.sk), logLine: r.logLine, webDoc: r.webDoc, vcs: [] };
+  save(W); renderDid();
+  $("pub").innerHTML = `<label>공개할 파일: ${esc(hp)}/did.jsonl</label><pre id="logOut">${esc(r.logLine)}</pre>
+    <button class="btn ghost" id="cplog">did.jsonl 복사</button>
+    <label>(선택) did:web 호환 파일: ${esc(hp)}/did.json</label><pre>${esc(JSON.stringify(r.webDoc,null,2))}</pre>
+    <p class="note">did.jsonl 내용을 Claude에게 보내면 GitHub Pages에 올려 드립니다. 개인키는 포함되어 있지 않습니다.</p>`;
+  copyBtn($("cplog"), "logOut");
+};
+$("chk").onclick = async () => {
+  if (!W.did) return alertBox("먼저 DID를 만드세요.");
+  try { const r = await K.resolve(W.did); $("pub").innerHTML = `<ul class="steps">${li(true, "공개됨: " + r.url)}${r.steps.map(s=>li(true,s)).join("")}</ul>`; }
+  catch(e){ $("pub").innerHTML = `<ul class="steps">${li(false, e.message)}</ul>`; }
+};
+$("exp").onclick = () => { if (!W.sk) return alertBox("키가 없습니다."); $("pub").innerHTML = `<label>개인키(base58) — 절대 공유하지 마세요</label><pre>${esc(W.sk)}</pre>`; };
+
+$("mkreq").onclick = async () => {
+  if (!W.did) return alert("먼저 DID를 만드세요.");
+  const key = await K.keyFromSecret(W.sk);
+  const req = { "@context": ["https://www.w3.org/ns/credentials/v2"], type: ["CredentialRequest"], holder: W.did,
+    nonce: $("nonce").value.trim(), claims: { name: $("claimName").value.trim() }, created: K.nowIso() };
+  req.proof = await K.diSign(req, key.sk, { verificationMethod: W.vm, proofPurpose: "authentication", challenge: req.nonce });
+  $("reqOut").textContent = JSON.stringify(req, null, 2); copyBtn($("cpreq"), "reqOut");
+};
+
+async function checkVc(vc, steps){
+  const iss = await K.resolve(vc.issuer); steps.push([true, "발급자 DID 해석: " + iss.url]); iss.steps.forEach(s=>steps.push([true,s]));
+  const pub = K.findVm(iss.doc, vc.proof.verificationMethod, "assertionMethod"); steps.push([true, "서명 키가 발급자 assertionMethod에 등록됨"]);
+  if (!(await K.diVerify(vc, vc.proof, pub))) throw new Error("VC 서명 불일치(내용 변조 가능성)");
+  steps.push([true, "VC 서명 검증"]);
+}
+$("savevc").onclick = async () => {
+  const steps = [];
+  try {
+    const vc = JSON.parse($("vcIn").value);
+    if (vc.credentialSubject?.id !== W.did) throw new Error("이 VC의 주체가 내 DID가 아닙니다");
+    steps.push([true, "VC 주체 = 내 DID"]);
+    await checkVc(vc, steps);
+    W.vcs = [...(W.vcs||[]), vc]; save(W); renderDid(); steps.push([true, "보관 완료"]);
+  } catch(e){ steps.push([false, e.message]); }
+  $("vcSteps").innerHTML = steps.map(([o,t])=>li(o,t)).join("");
+};
+$("mkvp").onclick = async () => {
+  if (!W.vcs?.length) return alert("보관된 VC가 없습니다.");
+  const key = await K.keyFromSecret(W.sk);
+  const vp = { "@context": ["https://www.w3.org/ns/credentials/v2"], type: ["VerifiablePresentation"], holder: W.did, verifiableCredential: [W.vcs[W.vcs.length-1]] };
+  vp.proof = await K.diSign(vp, key.sk, { verificationMethod: W.vm, proofPurpose: "authentication", challenge: $("chal").value.trim(), domain: location.host });
+  $("vpOut").textContent = JSON.stringify(vp, null, 2); copyBtn($("cpvp"), "vpOut");
+};
+
+let CHAL = null;
+$("newchal").onclick = () => { CHAL = K.b58enc(crypto.getRandomValues(new Uint8Array(16))); $("chalShow").style.display="inline-block"; $("chalShow").textContent = CHAL; };
+$("verify").onclick = async () => {
+  const steps = [];
+  try {
+    const vp = JSON.parse($("vpIn").value);
+    if (CHAL && vp.proof.challenge !== CHAL) throw new Error("challenge 불일치(재사용된 제출일 수 있음)");
+    steps.push([true, CHAL ? "challenge 일치" : "challenge 미설정(검증자 쪽 생성 권장)"]);
+    const h = await K.resolve(vp.holder); steps.push([true, "보유자 DID 해석: " + h.url]); h.steps.forEach(s=>steps.push([true,s]));
+    const hpub = K.findVm(h.doc, vp.proof.verificationMethod, "authentication");
+    if (!(await K.diVerify(vp, vp.proof, hpub))) throw new Error("VP 서명 불일치");
+    steps.push([true, "VP 서명 검증(보유자가 키를 가지고 있음)"]);
+    for (const vc of vp.verifiableCredential) {
+      if (vc.credentialSubject?.id !== vp.holder) throw new Error("VC 주체와 제출자가 다름");
+      steps.push([true, "VC 주체 = 제출자"]);
+      await checkVc(vc, steps);
+      steps.push([true, "내용: " + JSON.stringify(vc.credentialSubject)]);
+    }
+    steps.push([true, "최종: 검증 성공"]);
+  } catch(e){ steps.push([false, e.message]); }
+  $("vSteps").innerHTML = steps.map(([o,t])=>li(o,t)).join("");
+};
+</script>
+</body>
+</html>
