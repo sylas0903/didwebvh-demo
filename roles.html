@@ -73,6 +73,14 @@ a{color:var(--acc)}
   <h2><span class="tag op">운영자</span>1. 투자자에게 가스용 ETH 보내기</h2>
   <p class="note">투자자 계정은 ETH 가 없으면 서명은 되지만 전송 트랜잭션을 못 보냅니다.</p>
   <button class="btn" id="fundA">A 에게 0.005 ETH</button><button class="btn" id="fundB">B 에게 0.005 ETH</button>
+  <p class="note" style="margin-top:12px"><b>계정 간 ETH 나눠 쓰기</b> — 보내는 계정으로 MetaMask 를 바꾼 뒤 누르세요.</p>
+  <div class="row">
+    <button class="btn ghost" id="mvA1" style="margin:0">A → 운영자 0.003</button>
+    <button class="btn ghost" id="mvAB" style="margin:0">A → B 0.0007</button>
+    <select id="gFrom"><option value="op">운영자</option><option value="a" selected>투자자 A</option><option value="b">투자자 B</option></select> →
+    <select id="gTo"><option value="op" selected>운영자</option><option value="a">투자자 A</option><option value="b">투자자 B</option></select>
+    <input id="gAmt" value="0.001" style="width:90px"> <button class="btn ghost" id="gSend" style="margin:0">보내기</button>
+  </div>
   <ul class="steps" id="s1"></ul>
 </div>
 
@@ -143,6 +151,11 @@ function errName(e) {
   const data = e?.data || e?.info?.error?.data || e?.error?.data;
   for (const n of ["OnchainIdRegistry", "TokenSecurity", "DidWebvhAnchor"]) { try { const p = new ethers.Interface(ART[n].abi).parseError(data); if (p) return p.name; } catch {} }
   return e?.shortMessage || e?.message || String(e);
+}
+function friendly(e) {
+  const m = (e?.shortMessage || e?.message || "") + " " + (e?.info?.error?.message || "");
+  if (/insufficient funds|exceeds balance|missing revert data/i.test(m) && !/revert(ed)? with/i.test(m)) return "가스용 SepoliaETH 가 부족하거나 트랜잭션이 실패했습니다 — 카드의 '가스' 잔액을 확인하세요 (" + errName(e) + ")";
+  return errName(e);
 }
 async function signerAs(role, id) {
   const s = await provider.getSigner(); const addr = await s.getAddress();
@@ -228,8 +241,22 @@ $("refresh").onclick = refresh;
 // ---------- 1. 가스 지원 ----------
 for (const w of ["a", "b"]) $("fund" + w.toUpperCase()).onclick = async () => {
   try { const s = await signerAs("op"); await send("s1", `ETH 0.005 → 투자자 ${w.toUpperCase()}`, s.sendTransaction({ to: cfg()[w], value: ethers.parseEther("0.005") })); refresh(); }
-  catch (e) { out("s1", false, esc(errName(e))); }
+  catch (e) { out("s1", false, esc(friendly(e))); }
 };
+
+const RN = { op: "운영자", a: "투자자 A", b: "투자자 B" };
+async function moveEth(from, to, amt) {
+  try {
+    if (from === to) throw new Error("보내는 쪽과 받는 쪽이 같습니다");
+    const s = await signerAs(from); const value = ethers.parseEther(amt);
+    const have = await provider.getBalance(await s.getAddress());
+    if (have <= value) throw new Error(`${RN[from]} 잔액 ${ethers.formatEther(have).slice(0, 8)} ETH 로는 ${amt} ETH 와 수수료를 낼 수 없습니다`);
+    await send("s1", `ETH ${amt}: ${RN[from]} → ${RN[to]}`, s.sendTransaction({ to: cfg()[to], value })); refresh();
+  } catch (e) { out("s1", false, esc(friendly(e))); }
+}
+$("mvA1").onclick = () => moveEth("a", "op", "0.003");
+$("mvAB").onclick = () => moveEth("a", "b", "0.0007");
+$("gSend").onclick = () => moveEth($("gFrom").value, $("gTo").value, $("gAmt").value.trim());
 
 // ---------- 2. 온보딩 ----------
 $("invSign").onclick = async () => {
