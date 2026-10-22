@@ -62,6 +62,7 @@ a{color:var(--acc)}
   <h2>4. 연결 후: 토큰 게이트</h2>
   <button class="btn" id="mint" disabled>토큰증권 100 DAS 발행 → 내 지갑</button>
   <button class="btn ghost" id="strangerTx" disabled>미검증 주소로 전송 시뮬레이션</button>
+  <button class="btn ghost" id="watch" disabled>MetaMask 에 DAS 토큰 추가</button>
   <ul class="steps" id="s4"></ul>
 </div>
 
@@ -115,7 +116,7 @@ function attach(addrs) {
   C.reg = new ethers.Contract(addrs.reg, ART.OnchainIdRegistry.abi, signer);
   C.das = new ethers.Contract(addrs.das, ART.TokenSecurity.abi, signer);
   C.anc = new ethers.Contract(addrs.anc, ART.DidWebvhAnchor.abi, signer);
-  for (const b of ["before", "bridge", "mint", "strangerTx", "rollback", "revoke"]) $(b).disabled = false;
+  for (const b of ["before", "bridge", "mint", "strangerTx", "rollback", "revoke", "watch"]) $(b).disabled = false;
 }
 
 $("connect").onclick = async () => {
@@ -234,6 +235,13 @@ $("bridge").onclick = async () => {
 $("mint").onclick = async () => {
   try { await send("s4", "TokenSecurity.mint(내 지갑, 100)", C.das.mint(me, 100)); out("s4", true, `잔액: ${await C.das.balanceOf(me)} DAS`); }
   catch (e) { out("s4", false, `발행 거부: <b>${esc(errName(e))}</b>`); }
+};
+$("watch").onclick = async () => {
+  try {
+    const ok = await window.ethereum.request({ method: "wallet_watchAsset",
+      params: { type: "ERC20", options: { address: await C.das.getAddress(), symbol: "DAS", decimals: 18 } } });
+    out("s4", ok ? true : false, ok ? "MetaMask 에 DAS 추가됨 (Sepolia 네트워크에서 표시, 100 은 최소단위라 아주 작은 수로 보임)" : "추가가 취소되었습니다");
+  } catch (e) { out("s4", false, esc(e.message || e)); }
 };
 $("strangerTx").onclick = async () => {
   const stranger = ethers.Wallet.createRandom().address;
