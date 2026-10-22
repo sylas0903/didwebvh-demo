@@ -46,7 +46,7 @@ a{color:var(--acc)}
 <p class="lead">Account 1 = 운영자(컨트랙트 owner), Account 2·3 = 투자자. 각 버튼은 표시된 역할의 계정으로 MetaMask 를 바꾼 뒤 누르세요. <a href="./chain.html">← 단일 계정 페이지</a> · <a href="./index.html">지갑</a></p>
 
 <div id="who">현재 MetaMask 계정: <b id="cur">연결 안 됨</b> <span id="curRole"></span>
-  <button class="btn ghost" id="connect" style="margin:0 0 0 8px;padding:4px 10px">연결</button></div>
+  <button class="btn ghost" id="connect" style="margin:0 0 0 8px;padding:4px 10px">연결 / 계정 선택</button></div>
 
 <div class="cards" id="cards"></div>
 
@@ -179,7 +179,8 @@ async function updateWho() {
 })();
 $("connect").onclick = async () => {
   try {
-    await window.ethereum.request({ method: "eth_requestAccounts" });
+    try { await window.ethereum.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] }); }
+    catch (e) { if (e.code === 4001) throw e; await window.ethereum.request({ method: "eth_requestAccounts" }); }
     if ((await provider.getNetwork()).chainId !== 11155111n) {
       await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xaa36a7" }] });
       provider = new ethers.BrowserProvider(window.ethereum);
