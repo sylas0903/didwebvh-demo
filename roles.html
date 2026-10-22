@@ -90,6 +90,7 @@ a{color:var(--acc)}
   <div class="row"><select id="who2"><option value="a">투자자 A</option><option value="b">투자자 B</option></select>
     <button class="btn" id="invSign" style="margin:0">① 투자자: VP + 지갑 서명</button>
     <button class="btn" id="opReg" style="margin:0">② 운영자: 검증 후 등록</button></div>
+  <label style="display:block;margin-top:8px;font-size:14px"><input type="checkbox" id="lite" checked> 가스 절약 모드 — 클레임 data 에 근거(DID·VC·발급자 버전)의 32바이트 해시만 저장, 지갑↔DID 연결·앵커 기록 생략 (등록 트랜잭션 2회)</label>
   <ul class="steps" id="s2"></ul>
 </div>
 
@@ -302,10 +303,14 @@ $("opReg").onclick = async () => {
     const sub = SUB[w]; if (!sub) throw new Error(`투자자 ${w.toUpperCase()} 의 제출물이 없습니다 — ① 먼저`);
     const s = await signerAs("op"); const { reg, anc } = contracts(s);
     const v = await verifySubmission(sub, step);
-    const data = ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "bytes32", "bytes32", "string"],
+    const full = ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "bytes32", "bytes32", "string"],
       [ethers.id(v.holder), ethers.sha256(ethers.toUtf8Bytes(K.jcs(v.vc))), ethers.id(v.issuer), v.iv]);
+    const lite = $("lite").checked;
+    const data = lite ? ethers.keccak256(full) : full;
+    if (lite) step(`가스 절약 모드: 클레임 data = keccak256(근거) ${data.slice(0, 18)}…`);
     if (!(await reg.identityOf(sub.addr))[2]) await send(id, "addIdentity", reg.addIdentity(sub.addr, ethers.sha256(ethers.toUtf8Bytes(v.holder)), 410));
-    await send(id, "addClaim(KYC, data=DID·VC 해시)", reg.addClaim(sub.addr, 1, sub.sig, data, BigInt(Math.floor(Date.now() / 1000) + 730 * 86400)));
+    await send(id, lite ? "addClaim(KYC, data=근거 해시)" : "addClaim(KYC, data=DID·VC 해시)", reg.addClaim(sub.addr, 1, lite ? "0x" : sub.sig, data, BigInt(Math.floor(Date.now() / 1000) + 730 * 86400)));
+    if (lite) { delete SUB[w]; out(id, true, `<b>투자자 ${w.toUpperCase()} 등록 완료 — isVerified = ${await reg.isVerified(sub.addr)}</b>`); refresh(); return; }
     const linked = await anc.walletOfDid(ethers.id(v.holder));
     if (linked !== ethers.ZeroAddress && linked.toLowerCase() !== sub.addr.toLowerCase()) await send(id, `이전 연결 해제 (${short(linked)})`, anc.unlinkDid(linked));
     const curDid = await anc.didOf(sub.addr);
