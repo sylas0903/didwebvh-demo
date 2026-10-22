@@ -47,6 +47,8 @@ ul.steps{padding-left:0;list-style:none;margin:10px 0 0}ul.steps li{padding:3px 
   <button class="btn" id="mk">새 키 + DID 생성</button>
   <button class="btn ghost" id="chk">공개 여부 확인</button>
   <button class="btn ghost" id="exp">키 백업 보기</button>
+  <button class="btn ghost" id="mvOut">다른 브라우저로 옮기기</button>
+  <button class="btn ghost" id="mvIn">옮겨온 지갑 가져오기</button>
   <div id="pub"></div>
 </section>
 
@@ -131,6 +133,27 @@ $("chk").onclick = async () => {
   if (!W.did) return alertBox("먼저 DID를 만드세요.");
   try { const r = await K.resolve(W.did); $("pub").innerHTML = `<ul class="steps">${li(true, "공개됨: " + r.url)}${r.steps.map(s=>li(true,s)).join("")}</ul>`; }
   catch(e){ $("pub").innerHTML = `<ul class="steps">${li(false, e.message)}</ul>`; }
+};
+$("mvOut").onclick = () => {
+  if (!W.sk) return alertBox("옮길 지갑이 없습니다.");
+  $("pub").innerHTML = `<label>지갑 전체(개인키 포함) — 내 다른 브라우저에만 붙여넣고, 절대 남에게 보내지 마세요</label>
+    <pre id="mvData">${esc(JSON.stringify(W))}</pre><button class="btn ghost" id="cpmv">복사</button>`;
+  $("cpmv").onclick = () => navigator.clipboard.writeText($("mvData").textContent);
+};
+$("mvIn").onclick = () => {
+  $("pub").innerHTML = `<label>다른 브라우저에서 복사한 지갑 데이터 붙여넣기</label><textarea id="mvPaste"></textarea>
+    <button class="btn" id="mvGo">가져오기</button>`;
+  $("mvGo").onclick = async () => {
+    try {
+      const d = JSON.parse($("mvPaste").value);
+      const k = await K.keyFromSecret(d.sk);
+      const line = JSON.parse(d.logLine);
+      if (!line.parameters.updateKeys.includes(k.multikey) || line.state.id !== d.did) throw new Error("키와 DID 가 맞지 않습니다");
+      if (W.did && W.did !== d.did && !confirm("이 브라우저의 기존 DID 를 덮어씁니다. 계속할까요?")) return;
+      W = d; save(W); renderDid();
+      $("pub").innerHTML = `<p class="ok">✔ 가져오기 완료 — VC ${(W.vcs||[]).length}개</p>`;
+    } catch (e) { alertBox("가져오기 실패: " + e.message); }
+  };
 };
 $("exp").onclick = () => { if (!W.sk) return alertBox("키가 없습니다."); $("pub").innerHTML = `<label>개인키(base58) — 절대 공유하지 마세요</label><pre>${esc(W.sk)}</pre>`; };
 
